@@ -2003,6 +2003,8 @@ async def telegram_auth_middleware(request: Request, call_next):
     frontend can load before the user authenticates.
     """
     path = request.url.path
+    if os.getenv("DISABLE_AUTH", "").lower() in ("1", "true", "yes"):
+        return await call_next(request)
     client_host = request.client.host if request.client else ""
     # Check if request came through the Cloudflare tunnel (forwarded header)
     forwarded_for = request.headers.get("x-forwarded-for", "").strip()
