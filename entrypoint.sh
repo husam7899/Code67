@@ -1,6 +1,6 @@
 #!/bin/sh
 # =============================================================================
-# entrypoint.sh — non-interactive provider setup + launch of the web UI.
+# entrypoint.sh - non-interactive provider setup + launch of the web UI.
 #
 # Railway can't run the interactive `hermes setup` wizard, so this writes the
 # Groq custom-provider config directly into config.yaml on first boot (skips
@@ -29,7 +29,7 @@ EOF
 fi
 
 if [ -z "${GROQ_API_KEY:-}" ]; then
-  echo "[entrypoint] WARNING: GROQ_API_KEY is not set — the agent will fail to reach Groq." >&2
+  echo "[entrypoint] WARNING: GROQ_API_KEY is not set - the agent will fail to reach Groq." >&2
 fi
 
 exec python -B -c "from hermes_cli.web_server import start_server; start_server('0.0.0.0', int(__import__('os').environ.get('PORT', '9119')), False)"
