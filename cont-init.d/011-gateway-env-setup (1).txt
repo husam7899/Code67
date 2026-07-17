@@ -1,0 +1,63 @@
+#!/command/with-contenv sh
+set -eu
+
+CONFIG_FILE="${HERMES_HOME:-/opt/data}/config.yaml"
+mkdir -p "$(dirname "$CONFIG_FILE")"
+touch "$CONFIG_FILE"
+
+if ! grep -q "name: groq" "$CONFIG_FILE" 2>/dev/null; then
+  echo "[011-gateway-env-setup] Adding Groq as a custom provider to $CONFIG_FILE"
+  cat >> "$CONFIG_FILE" <<'EOF'
+
+custom_providers:
+  - name: groq
+    base_url: https://api.groq.com/openai/v1
+    key_env: GROQ_API_KEY
+
+model:
+  default: llama-3.3-70b-versatile
+  provider: custom:groq
+EOF
+fi
+
+ENV_FILE="${HERMES_HOME:-/opt/data}/.env"
+touch "$ENV_FILE"
+
+set_env_var() {
+  key="$1"
+  value="$2"
+  if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    sed -i "/^${key}=/d" "$ENV_FILE"
+  fi
+  echo "${key}=${value}" >> "$ENV_FILE"
+}
+
+# Fallback: read directly from s6's container-environment files in case
+# the shell environment itself still doesn't have it for some reason.
+_read_contenv() {
+  key="$1"
+  if [ -n "$(eval echo \"\${$key:-}\")" ]; then
+    eval echo \"\${$key}\"
+  elif [ -f "/run/s6/container_environment/$key" ]; then
+    cat "/run/s6/container_environment/$key"
+  else
+    echo ""
+  fi
+}
+
+current_enabled="$(grep "^API_SERVER_ENABLED=" "$ENV_FILE" 2>/dev/null | head -n1 | cut -d= -f2-)"
+if [ "$current_enabled" != "true" ]; then
+  echo "[011-gateway-env-setup] Fixing API_SERVER_ENABLED (was: '${current_enabled:-<unset>}') -> true"
+  set_env_var "API_SERVER_ENABLED" "true"
+fi
+
+GROQ_KEY_VALUE="$(_read_contenv GROQ_API_KEY)"
+if [ -n "$GROQ_KEY_VALUE" ]; then
+  current_groq="$(grep "^GROQ_API_KEY=" "$ENV_FILE" 2>/dev/null | head -n1 | cut -d= -f2-)"
+  if [ "$current_groq" != "$GROQ_KEY_VALUE" ]; then
+    echo "[011-gateway-env-setup] Syncing GROQ_API_KEY into $ENV_FILE"
+    set_env_var "GROQ_API_KEY" "$GROQ_KEY_VALUE"
+  fi
+else
+  echo "[011-gateway-env-setup] WARNING: GROQ_API_KEY is not set in Railway Variables - the agent will fail to reach Groq." >&2
+fi
