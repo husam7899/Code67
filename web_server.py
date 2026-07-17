@@ -66,6 +66,12 @@ _log.setLevel(logging.DEBUG)
 
 app = FastAPI(title="Hermes Agent", version=__version__)
 
+
+@app.get("/health")
+async def health_check():
+    """Lightweight, unauthenticated liveness check for the SPA/token gate."""
+    return {"status": "ok"}
+
 # ---------------------------------------------------------------------------
 # Session token for protecting sensitive endpoints (reveal).
 # Generated fresh on every server start — dies when the process exits.
