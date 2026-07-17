@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/command/with-contenv sh
 set -eu
 
 CONFIG_FILE="${HERMES_HOME:-/opt/data}/config.yaml"
@@ -32,21 +32,31 @@ set_env_var() {
   echo "${key}=${value}" >> "$ENV_FILE"
 }
 
-# Force API_SERVER_ENABLED=true every boot — self-heals even if a previous
-# bad write (e.g. a key accidentally saved under this name) corrupted it.
+# Fallback: read directly from s6's container-environment files in case
+# the shell environment itself still doesn't have it for some reason.
+_read_contenv() {
+  key="$1"
+  if [ -n "$(eval echo \"\${$key:-}\")" ]; then
+    eval echo \"\${$key}\"
+  elif [ -f "/run/s6/container_environment/$key" ]; then
+    cat "/run/s6/container_environment/$key"
+  else
+    echo ""
+  fi
+}
+
 current_enabled="$(grep "^API_SERVER_ENABLED=" "$ENV_FILE" 2>/dev/null | head -n1 | cut -d= -f2-)"
 if [ "$current_enabled" != "true" ]; then
   echo "[011-gateway-env-setup] Fixing API_SERVER_ENABLED (was: '${current_enabled:-<unset>}') -> true"
   set_env_var "API_SERVER_ENABLED" "true"
 fi
 
-# Sync GROQ_API_KEY from Railway's environment into .env on every boot,
-# so the gateway (which reads .env) always has the current value.
-if [ -n "${GROQ_API_KEY:-}" ]; then
+GROQ_KEY_VALUE="$(_read_contenv GROQ_API_KEY)"
+if [ -n "$GROQ_KEY_VALUE" ]; then
   current_groq="$(grep "^GROQ_API_KEY=" "$ENV_FILE" 2>/dev/null | head -n1 | cut -d= -f2-)"
-  if [ "$current_groq" != "$GROQ_API_KEY" ]; then
+  if [ "$current_groq" != "$GROQ_KEY_VALUE" ]; then
     echo "[011-gateway-env-setup] Syncing GROQ_API_KEY into $ENV_FILE"
-    set_env_var "GROQ_API_KEY" "$GROQ_API_KEY"
+    set_env_var "GROQ_API_KEY" "$GROQ_KEY_VALUE"
   fi
 else
   echo "[011-gateway-env-setup] WARNING: GROQ_API_KEY is not set in Railway Variables - the agent will fail to reach Groq." >&2
