@@ -2015,7 +2015,7 @@ async def telegram_auth_middleware(request: Request, call_next):
         return await call_next(request)
     # Whitelist static/frontend paths — the frontend must load before auth
     path = request.url.path
-    if path in ("", "/", "/index.html", "/favicon.ico") or path.startswith("/assets/") or path.startswith("/miniapp") or path.startswith("/fonts/"):
+    if path in ("", "/", "/index.html", "/favicon.ico", "/health") or path.startswith("/assets/") or path.startswith("/miniapp") or path.startswith("/fonts/"):
         return await call_next(request)
     # Check Telegram Ed25519
     tg_init = request.headers.get("x-telegram-init-data", "").strip()
