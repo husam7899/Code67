@@ -2080,6 +2080,37 @@ async def get_session_usage():
 _GW_BASE = "http://127.0.0.1:8642"
 
 
+@app.get("/api/debug/gateway")
+async def debug_gateway():
+    """Diagnostic: check whether the internal gateway (port 8642) is reachable
+    and whether it's actually running with the API server enabled."""
+    import socket
+    import httpx
+    result: Dict[str, Any] = {"target": _GW_BASE}
+
+    # 1. Raw TCP connect check — tells us if anything is listening at all.
+    try:
+        sock = socket.create_connection(("127.0.0.1", 8642), timeout=3)
+        sock.close()
+        result["tcp_connect"] = "open"
+    except Exception as e:
+        result["tcp_connect"] = f"failed: {type(e).__name__}: {e}"
+
+    # 2. HTTP /health check on the gateway itself.
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{_GW_BASE}/health")
+            result["gateway_health_status"] = resp.status_code
+            result["gateway_health_body"] = resp.text[:500]
+    except Exception as e:
+        result["gateway_health_error"] = f"{type(e).__name__}: {e}"
+
+    # 3. Whether API_SERVER_ENABLED is visible in this process's environment.
+    result["api_server_enabled_env"] = os.getenv("API_SERVER_ENABLED", "(not set)")
+
+    return result
+
+
 def _get_gw_api_key() -> str:
     """Load API_SERVER_KEY from .env (dashboard doesn't auto-load env)."""
     env = load_env()
