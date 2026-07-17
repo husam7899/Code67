@@ -47,7 +47,12 @@ RUN cd /tmp/web-build \
 # terminal, drawer menu). Adjust destination if it's served from elsewhere.
 COPY index.html /opt/hermes/index.html
 
-# --- Non-interactive provider setup (Groq) + launch -------------------------
+# --- Non-interactive provider setup (Groq) + gateway env, runs BEFORE ------
+# main-hermes starts (fixes API_SERVER_ENABLED being set too late)
+COPY cont-init.d/011-gateway-env-setup /etc/cont-init.d/011-gateway-env-setup
+RUN chmod +x /etc/cont-init.d/011-gateway-env-setup
+
+# --- Launch script -----------------------------------------------------------
 COPY entrypoint.sh /opt/hermes/entrypoint.sh
 RUN chmod +x /opt/hermes/entrypoint.sh
 
